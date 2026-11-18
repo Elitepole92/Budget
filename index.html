@@ -754,11 +754,6 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
       doc.line(L, y, L + 75, y); doc.line(L + 95, y, L + W, y);
       doc.setFont("helvetica", "normal"); doc.setFontSize(9);
       doc.text("Ort, Datum", L, y + 4.5); doc.text("Unterschrift bewirtende Person", L + 95, y + 4.5);
-      if (b.tip > 0) {
-        y += 20;
-        doc.line(L + 95, y, L + W, y);
-        doc.text("Trinkgeld " + eurTxt(b.tip) + " erhalten (Unterschrift Bedienung)", L + 95, y + 4.5);
-      }
       doc.setFontSize(8); doc.setTextColor(110);
       doc.text("Bitte die maschinell erstellte Originalrechnung beifügen.", L, 285);
       doc.setTextColor(0);
