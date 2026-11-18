@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b6e69">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Abendbudget</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: eine ruhige Spalte – Stand, Eintragen, Liste. Alles Weitere klappt erst bei Bedarf auf. */
+:root {
+  --bg: #f1f4f5;
+  --surface: #ffffff;
+  --ink: #12222a;
+  --muted: #64757c;
+  --line: #dde5e8;
+  --accent: #0b6e69;
+  --accent-ink: #ffffff;
+  --track: #e3eaec;
+  --ok: #1e7a46;
+  --warn: #a35a00;
+  --crit: #b42318;
+  --font-display: "Sora", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1517; --surface: #151f23; --ink: #e6eef0; --muted: #8fa2a9; --line: #233237;
+    --accent: #3cc7b9; --accent-ink: #062523; --track: #223136;
+    --ok: #4cc38a; --warn: #f0a33e; --crit: #ff7b72;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1517; --surface: #151f23; --ink: #e6eef0; --muted: #8fa2a9; --line: #233237;
+  --accent: #3cc7b9; --accent-ink: #062523; --track: #223136;
+  --ok: #4cc38a; --warn: #f0a33e; --crit: #ff7b72;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--font-body); }
+.wrap {
+  max-width: 520px; margin: 0 auto;
+  padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 14px;
+}
+h1 { font: 700 22px var(--font-display); margin: 0; letter-spacing: -0.01em; }
+p { margin: 0; }
+.num { font-variant-numeric: tabular-nums; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+button { font: 600 16px var(--font-body); cursor: pointer; border: 0; background: none; color: inherit; }
+input:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.trip { color: var(--muted); font-size: 14px; text-align: right; }
+.trip:hover { color: var(--accent); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 12px; min-width: 0; }
+
+/* Stand */
+.left { font: 700 46px/1 var(--font-display); letter-spacing: -0.02em; }
+.left.neg { color: var(--crit); }
+.meta { color: var(--muted); font-size: 14px; }
+.meter { position: relative; height: 8px; background: var(--track); border-radius: 999px; }
+.meter .fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--accent); }
+.meter .fill.warn { background: var(--warn); }
+.meter .fill.crit { background: var(--crit); }
+.facts { display: grid; gap: 6px; padding-top: 4px; }
+.facts .k { font-size: 14px; color: var(--muted); }
+.nums { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.nums div { display: grid; }
+.nums b { font: 600 24px var(--font-display); }
+.nums span { font-size: 14px; color: var(--muted); }
+.empty-on { padding-top: 6px; border-top: 1px solid var(--line); margin-top: 4px; }
+.empty-on b { font-weight: 600; }
+.empty-on b.warn { color: var(--warn); }
+.empty-on b.crit { color: var(--crit); }
+.verdict { display: flex; gap: 8px; align-items: baseline; font-weight: 600; font-size: 15px; }
+.verdict::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); transform: translateY(-1px); }
+.verdict.warn::before { background: var(--warn); }
+.verdict.crit::before { background: var(--crit); }
+@media (prefers-reduced-motion: no-preference) { .meter .fill { transition: width 0.4s ease; } }
+
+/* Eintragen */
+form { display: grid; gap: 10px; }
+input, textarea {
+  font: inherit; font-size: 16px; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; width: 100%; min-width: 0;
+}
+textarea { resize: vertical; min-height: 64px; }
+.amount-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+input.amount { font: 600 24px var(--font-display); }
+.cam {
+  display: grid; place-items: center; width: 56px; border-radius: 12px; cursor: pointer;
+  background: var(--bg); border: 1px solid var(--line); color: var(--ink);
+}
+.cam:hover { border-color: var(--accent); color: var(--accent); }
+.cam svg { width: 24px; height: 24px; }
+#a-photo:focus-visible + .cam { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sub-row { display: grid; grid-template-columns: 1fr 9.5em; gap: 8px; }
+.status { font-size: 14px; color: var(--muted); }
+.status.busy { color: var(--ink); }
+.status.bad { color: var(--crit); }
+.thumb-row { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.thumb { width: 40px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+.link { color: var(--accent); font-weight: 500; font-size: 14px; padding: 4px 0; }
+.check { display: flex; gap: 10px; align-items: center; font-size: 15px; cursor: pointer; color: var(--muted); }
+.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); flex: none; }
+fieldset.bew { border: 0; border-left: 2px solid var(--accent); padding: 2px 0 2px 12px; margin: 0; display: grid; gap: 10px; min-width: 0; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.primary { background: var(--accent); color: var(--accent-ink); border-radius: 12px; padding: 13px 16px; }
+.primary:disabled { opacity: 0.5; cursor: default; }
+.err { color: var(--crit); font-size: 14px; }
+
+/* Liste */
+.list { display: grid; gap: 4px; }
+.day-head { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: var(--muted); padding-top: 10px; }
+.day-head:first-child { padding-top: 0; }
+.item { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; min-height: 40px; min-width: 0; }
+.item .note { overflow-wrap: anywhere; min-width: 0; }
+.item .note.none { color: var(--muted); }
+.item .note small { display: block; color: var(--muted); font-size: 13px; line-height: 1.3; }
+.item .amt { font-weight: 600; }
+.item.out .amt { color: var(--muted); font-weight: 500; }
+.icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.icon:hover { color: var(--accent); background: var(--bg); }
+.icon svg { width: 18px; height: 18px; }
+.icon.confirm { width: auto; padding: 0 10px; background: var(--crit); color: #fff; }
+.empty { color: var(--muted); font-size: 15px; }
+
+/* Reise */
+details.settings > summary { cursor: pointer; list-style: none; font-weight: 600; color: var(--muted); font-size: 15px; }
+details.settings > summary::-webkit-details-marker { display: none; }
+details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.hint { font-size: 14px; color: var(--muted); }
+.reset { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding-top: 4px; }
+.reset .danger { color: var(--crit); font-weight: 600; font-size: 14px; }
+
+.sync { font-size: 13px; color: var(--warn); }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Abendbudget</h1>
+    <button type="button" class="trip num" id="trip-line">Reise festlegen</button>
+  </header>
+
+  <section class="card" id="status" aria-live="polite">
+    <div class="left num" id="left">–</div>
+    <div class="meter" role="img" id="meter" aria-label="Verbrauch des Budgets">
+      <div class="fill" id="fill" style="width:0%"></div>
+    </div>
+    <p class="meta" id="meta">Noch kein Budget festgelegt. Tippe oben rechts auf „Reise festlegen“.</p>
+    <div class="facts" id="facts" hidden>
+      <span class="k">Verbleibend:</span>
+      <div class="nums num">
+        <div><b id="f-per">–</b><span>pro Abend</span></div>
+        <div><b id="f-n">–</b><span id="f-n-label">Abende</span></div>
+      </div>
+      <p class="empty-on num"><span class="k">Aufgebraucht am:</span> <b id="f-empty">–</b></p>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Ausgabe eintragen">
+    <form id="add-form" novalidate>
+      <div class="amount-row">
+        <input id="a-amount" class="amount num" inputmode="decimal" autocomplete="off" placeholder="Betrag €" aria-label="Betrag in Euro">
+        <span id="scan-box" hidden style="display:contents">
+          <input type="file" id="a-photo" class="vh" accept="image/jpeg,image/png,image/webp" capture="environment">
+          <label for="a-photo" class="cam" title="Rechnung scannen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            <span class="vh">Rechnung scannen</span>
+          </label>
+        </span>
+      </div>
+      <p class="status" id="scan-status" hidden></p>
+      <div class="thumb-row" id="thumb-row" hidden>
+        <img class="thumb" id="a-thumb" alt="Foto der Rechnung">
+        <button type="button" class="link" id="thumb-remove">Foto entfernen</button>
+      </div>
+      <div class="sub-row">
+        <input id="a-note" maxlength="80" autocomplete="off" placeholder="Wo? (optional)" aria-label="Wo oder was">
+        <input id="a-date" type="date" aria-label="Abend">
+      </div>
+      <label class="check"><input type="checkbox" id="a-bew">Geschäftsessen mit Bewirtungsbeleg</label>
+      <fieldset class="bew" id="bew-box" hidden>
+        <legend class="vh">Bewirtungsbeleg</legend>
+        <textarea id="b-guests" rows="2" maxlength="800" placeholder="Gäste: Name, Firma (je Zeile)" aria-label="Bewirtete Personen"></textarea>
+        <input id="b-reason" maxlength="200" autocomplete="off" placeholder="Anlass, z. B. Projektbesprechung" aria-label="Anlass der Bewirtung">
+        <input id="b-host" maxlength="120" autocomplete="name" placeholder="Gastgeber: du, Firma" aria-label="Bewirtende Person">
+        <input id="b-place" maxlength="120" autocomplete="off" placeholder="Restaurant" aria-label="Restaurant">
+        <input id="b-address" maxlength="160" autocomplete="off" placeholder="Anschrift" aria-label="Anschrift des Restaurants">
+        <div class="pair">
+          <input id="b-total" class="num" inputmode="decimal" autocomplete="off" placeholder="Rechnung €" aria-label="Rechnungsbetrag in Euro">
+          <input id="b-tip" class="num" inputmode="decimal" autocomplete="off" placeholder="Trinkgeld €" aria-label="Trinkgeld in Euro">
+        </div>
+        <label class="check"><input type="checkbox" id="a-excl" checked>Nicht aufs Abendbudget anrechnen</label>
+      </fieldset>
+      <p class="err" id="add-err" hidden></p>
+      <button type="submit" class="primary" id="add-btn">Eintragen</button>
+    </form>
+  </section>
+
+  <section class="card" aria-label="Ausgaben">
+    <div class="list" id="list"><p class="empty">Noch nichts eingetragen.</p></div>
+  </section>
+
+  <details class="settings card" id="settings">
+    <summary>Reise ändern</summary>
+    <form id="trip-form" novalidate>
+      <div class="field">
+        <label for="t-budget">Budget gesamt in €</label>
+        <input id="t-budget" class="num" inputmode="decimal" autocomplete="off" placeholder="z. B. 150">
+      </div>
+      <div class="pair">
+        <div class="field"><label for="t-start">Erster Abend</label><input id="t-start" type="date"></div>
+        <div class="field"><label for="t-end">Letzter Abend</label><input id="t-end" type="date"></div>
+      </div>
+      <p class="hint num" id="t-hint"></p>
+      <p class="err" id="trip-err" hidden></p>
+      <button type="submit" class="primary">Speichern</button>
+    </form>
+    <div class="reset">
+      <button type="button" class="link" id="reset-btn">Alle Ausgaben löschen</button>
+      <button type="button" class="danger" id="reset-yes" hidden>Ja, löschen</button>
+      <button type="button" class="link" id="reset-no" hidden>Abbrechen</button>
+    </div>
+  </details>
+
+  <p class="sync" id="sync" hidden></p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var LOCAL_KEY = "abendbudget-local";
+
+  /* ---------- Zustand ---------- */
+  var state = { budget: null, start: null, end: null, host: "", expenses: [] };
+  var store = null;          // { save(state) } – db oder lokal
+  var writing = Promise.resolve();
+  var cap = { sample: null, assets: null, downloads: null };
+  var photo = null;          // { blob, dataUrl, w, h } der gerade gescannten Rechnung
+  var photoCache = {};       // Asset-ID -> { dataUrl, w, h } für PDFs in dieser Sitzung
+  var scanCtl = null;
+
+  /* ---------- Datum & Geld ---------- */
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function todayIso() { var d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function dayNum(iso) { var p = iso.split("-"); return Math.round(Date.UTC(+p[0], +p[1] - 1, +p[2]) / 864e5); }
+  function isoOf(n) { var d = new Date(n * 864e5); return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate()); }
+  var WD = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  function fmtDay(iso, withWd) {
+    var n = dayNum(iso), d = new Date(n * 864e5);
+    return (withWd ? WD[d.getUTCDay()] + ", " : "") + pad(d.getUTCDate()) + "." + pad(d.getUTCMonth() + 1) + ".";
+  }
+  var eur = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
+  function money(v) { return eur.format(v); }
+  function parseAmount(s) {
+    s = String(s || "").trim().replace(/\s|€/g, "");
+    if (!s) return NaN;
+    if (s.indexOf(",") >= 0) s = s.replace(/\./g, "").replace(",", ".");
+    var v = Number(s);
+    return isFinite(v) ? Math.round(v * 100) / 100 : NaN;
+  }
+  function plural(n, one, many) { return n === 1 ? one : many; }
+
+  /* ---------- Rechnung ---------- */
+  function compute() {
+    var s = state;
+    if (!(s.budget > 0) || !s.start || !s.end || dayNum(s.end) < dayNum(s.start)) return null;
+    var first = dayNum(s.start), last = dayNum(s.end), today = dayNum(todayIso());
+    var evenings = last - first + 1;
+    var counted = s.expenses.filter(function (e) { return !e.excluded; });
+    var spent = counted.reduce(function (a, e) { return a + e.amount; }, 0);
+    spent = Math.round(spent * 100) / 100;
+    var left = Math.round((s.budget - spent) * 100) / 100;
+    var hasToday = counted.some(function (e) { return e.date === todayIso(); });
+    // Abende, die als erledigt zählen: alle vor heute, heute nur, wenn schon etwas eingetragen ist
+    var passed = Math.max(0, Math.min(evenings, today - first + (hasToday ? 1 : 0)));
+    var remaining = evenings - passed;
+    var planPer = s.budget / evenings;
+    var r = {
+      evenings: evenings, spent: spent, left: left, passed: passed, remaining: remaining,
+      planPer: planPer, planSoFar: planPer * passed,
+      perLeft: remaining > 0 ? left / remaining : null,
+      avg: passed > 0 ? spent / passed : null,
+      before: today < first, after: today > last, first: first, last: last
+    };
+    // Prognose: im bisherigen Tempo weiter
+    if (r.avg !== null && r.avg > 0 && remaining > 0) {
+      var lasts = left / r.avg;                         // so viele Abende reicht der Rest
+      r.lastsEvenings = lasts;
+      r.endBalance = left - r.avg * remaining;
+      if (lasts >= remaining) r.reach = "end";
+      else r.reachDay = first + passed + Math.max(0, Math.floor(lasts)) - 1; // letzter voll bezahlter Abend
+    }
+    return r;
+  }
+
+  /* ---------- Darstellung ---------- */
+  function render() {
+    var r = compute();
+    var s = state;
+
+    // Kopfzeile
+    if (s.start && s.end && s.budget > 0) {
+      $("trip-line").textContent = fmtDay(s.start, false) + "–" + fmtDay(s.end, false) + " · " + money(s.budget);
+    } else {
+      $("trip-line").textContent = "Reise festlegen";
+    }
+
+    // Einstellungsformular nur füllen, wenn der Nutzer gerade nicht darin tippt
+    if (!$("trip-form").contains(document.activeElement) && s.budget > 0 && s.start && s.end) {
+      $("t-budget").value = String(s.budget).replace(".", ",");
+      $("t-start").value = s.start;
+      $("t-end").value = s.end;
+    }
+    tripHint();
+
+    if (!r) {
+      $("left").textContent = "–";
+      $("left").classList.remove("neg");
+      $("meta").hidden = false;
+      $("facts").hidden = true;
+      $("fill").style.width = "0%";
+    } else {
+      $("left").textContent = money(r.left);
+      $("left").classList.toggle("neg", r.left < 0);
+      var pct = Math.min(100, Math.max(0, r.spent / s.budget * 100));
+      $("fill").style.width = pct + "%";
+      $("meter").setAttribute("aria-label", Math.round(pct) + " Prozent des Budgets ausgegeben");
+      $("meta").hidden = true;
+      $("facts").hidden = false;
+      $("f-per").textContent = r.remaining > 0 ? money(Math.max(0, r.perLeft)) : "–";
+      $("f-n").textContent = String(r.remaining);
+      $("f-n-label").textContent = plural(r.remaining, "Abend", "Abende");
+      var em = emptyDay(r);
+      $("f-empty").textContent = em.text;
+      $("f-empty").className = em.level;
+      $("fill").className = "fill" + (em.level ? " " + em.level : "");
+    }
+    renderList();
+  }
+
+  // Wann ist das Budget im bisherigen Tempo leer?
+  function emptyDay(r) {
+    if (r.left <= 0) return { text: "schon aufgebraucht", level: "crit" };
+    if (r.remaining === 0) return { text: "nicht, " + money(r.left) + " übrig", level: "" };
+    if (r.avg === null || r.avg <= 0) return { text: "noch keine Ausgaben", level: "" };
+    if (r.reach === "end") return { text: "nach Reiseende", level: r.endBalance < r.planPer * 0.25 ? "warn" : "" };
+    var day = r.first + r.passed + Math.max(0, Math.floor(r.lastsEvenings));
+    var shortBy = -r.endBalance;
+    return { text: fmtDay(isoOf(day), true), level: shortBy > r.planPer ? "crit" : "warn" };
+  }
+
+  function sumSpent() { return state.expenses.reduce(function (a, e) { return a + (e.excluded ? 0 : e.amount); }, 0); }
+
+  var pendingDelete = null;
+  function renderList() {
+    var list = $("list");
+    list.textContent = "";
+    if (!state.expenses.length) {
+      var p = document.createElement("p");
+      p.className = "empty";
+      p.textContent = "Noch nichts eingetragen.";
+      list.appendChild(p);
+      return;
+    }
+    var byDay = {};
+    state.expenses.forEach(function (e) { (byDay[e.date] = byDay[e.date] || []).push(e); });
+    Object.keys(byDay).sort().reverse().forEach(function (d) {
+      var items = byDay[d];
+      var head = document.createElement("div"); head.className = "day-head num";
+      var l = document.createElement("span"); l.textContent = d === todayIso() ? "Heute" : fmtDay(d, true);
+      head.appendChild(l); list.appendChild(head);
+      items.forEach(function (e) {
+        var row = document.createElement("div"); row.className = "item" + (e.excluded ? " out" : "");
+        var note = document.createElement("span"); note.className = "note" + (e.note ? "" : " none"); note.textContent = e.note || "Abendessen";
+        if (e.beleg || e.excluded) {
+          var t = document.createElement("small");
+          t.textContent = e.beleg ? (e.excluded ? "Bewirtung, nicht angerechnet" : "Bewirtung") : "nicht angerechnet";
+          note.appendChild(t);
+        }
+        var amt = document.createElement("span"); amt.className = "amt num"; amt.textContent = money(e.amount);
+        var actions = document.createElement("span"); actions.className = "item-actions";
+        actions.style.display = "flex";
+        if (e.beleg && window.jspdf && (cap.downloads || !window.claude)) {
+          var pdfBtn = document.createElement("button"); pdfBtn.type = "button"; pdfBtn.className = "icon";
+          pdfBtn.title = "Bewirtungsbeleg als PDF";
+          pdfBtn.setAttribute("aria-label", "Bewirtungsbeleg als PDF speichern");
+          pdfBtn.textContent = "PDF";
+          pdfBtn.addEventListener("click", function () { savePdf(e, pdfBtn); });
+          actions.appendChild(pdfBtn);
+        }
+        var del = document.createElement("button"); del.type = "button";
+        var confirming = pendingDelete === e.id;
+        del.className = "icon" + (confirming ? " confirm" : "");
+        if (confirming) del.textContent = "Löschen";
+        else del.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+        del.setAttribute("aria-label", confirming ? "Ausgabe wirklich löschen" : "Ausgabe " + money(e.amount) + " löschen");
+        del.addEventListener("click", function () {
+          if (pendingDelete === e.id) {
+            pendingDelete = null;
+            state.expenses = state.expenses.filter(function (x) { return x.id !== e.id; });
+            save(); render();
+          } else {
+            pendingDelete = e.id; renderList();
+          }
+        });
+        actions.appendChild(del);
+        row.appendChild(note); row.appendChild(amt); row.appendChild(actions);
+        list.appendChild(row);
+      });
+    });
+  }
+
+  function tripHint() {
+    var b = parseAmount($("t-budget").value), s = $("t-start").value, e = $("t-end").value;
+    if (s && e && dayNum(e) >= dayNum(s)) {
+      var n = dayNum(e) - dayNum(s) + 1;
+      $("t-hint").textContent = n + " " + plural(n, "Abend", "Abende") + (b > 0 ? " · " + money(b / n) + " pro Abend" : "");
+    } else $("t-hint").textContent = "";
+  }
+
+  /* ---------- Speichern ---------- */
+  function snapshotState() {
+    return { budget: state.budget, start: state.start, end: state.end, host: state.host, expenses: state.expenses.slice(), updated: new Date().toISOString() };
+  }
+  function save() {
+    if (!store) return;
+    var data = snapshotState();
+    writing = writing.then(function () { return store.save(data); }).then(function () {
+      setSync(store.label, false);
+    }, function (err) {
+      setSync("Speichern fehlgeschlagen" + (err && err.code === "quota_exceeded" ? ": Speicher voll." : ". Bitte gleich noch einmal versuchen."), true);
+    });
+  }
+  function setSync(text, warn) { $("sync").textContent = text; $("sync").hidden = !warn; }
+
+  function applyRemote(d) {
+    if (!d) return;
+    state.budget = typeof d.budget === "number" ? d.budget : null;
+    state.start = typeof d.start === "string" ? d.start : null;
+    state.end = typeof d.end === "string" ? d.end : null;
+    state.host = typeof d.host === "string" ? d.host : "";
+    state.expenses = Array.isArray(d.expenses) ? d.expenses.filter(function (e) {
+      return e && typeof e.amount === "number" && typeof e.date === "string";
+    }).map(function (e) {
+      return {
+        id: String(e.id || Math.random()), amount: e.amount, date: e.date,
+        note: typeof e.note === "string" ? e.note : "",
+        excluded: e.excluded === true,
+        photo: typeof e.photo === "string" ? e.photo : null,
+        beleg: e.beleg && typeof e.beleg === "object" ? e.beleg : null
+      };
+    }) : [];
+    if (!$("b-host").value && state.host) $("b-host").value = state.host;
+    render();
+  }
+
+  function useLocal(reason) {
+    store = {
+      label: "Nur in diesem Browser gespeichert. " + reason,
+      save: function (data) { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); } catch (e) { throw { code: "unavailable" }; } return Promise.resolve(); }
+    };
+    try { applyRemote(JSON.parse(localStorage.getItem(LOCAL_KEY) || "null")); } catch (e) { /* leer starten */ }
+    setSync(store.label, true);
+    render();
+  }
+
+  async function connect() {
+    var c = window.claude;
+    if (!c || typeof c.use !== "function") { useLocal("Öffne die Seite in Claude, damit es auf allen Geräten gespeichert wird."); return; }
+    setupExtras(c);
+    var db = null, user = null, uid = null;
+    try { db = await c.use("db"); user = await c.use("user"); uid = user ? await user.id() : null; } catch (e) { db = null; }
+    if (!db || !uid) { useLocal("Melde dich bei Claude an, damit es auf allen Geräten gespeichert wird."); return; }
+    var ref = db.doc("data/users/" + uid + "/abendbudget");
+    store = {
+      label: "Gespeichert in deinem Claude-Konto, auf allen Geräten.",
+      save: function (data) { return ref.set(data); }
+    };
+    var timer = setTimeout(function () { setSync("Gespeicherte Daten sind gerade nicht erreichbar. Neue Einträge werden gespeichert, sobald die Verbindung steht.", true); }, 10000);
+    ref.onSnapshot(function (snap) {
+      if (!snap.metadata.fromCache) { clearTimeout(timer); setSync(store.label, false); }
+      if (snap.exists) applyRemote(snap.data());
+      else render();
+    }, function (err) {
+      clearTimeout(timer);
+      setSync(err && err.code === "revoked" ? "Kein Zugriff mehr auf die gespeicherten Daten." : "Verbindung zum Speicher verloren. Lade die Seite neu.", true);
+    });
+  }
+
+  /* ---------- Eingaben ---------- */
+  $("a-date").value = todayIso();
+
+  $("add-form").addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    var amount = parseAmount($("a-amount").value);
+    var date = $("a-date").value || todayIso();
+    var err = $("add-err");
+    function fail(msg, focusId) { err.textContent = msg; err.hidden = false; if (focusId) $(focusId).focus(); }
+    if (!(amount > 0)) return fail("Gib einen Betrag ein, z. B. 24,50.", "a-amount");
+    if (amount > 10000) return fail("Der Betrag wirkt zu hoch. Bitte prüfen.", "a-amount");
+
+    var bew = $("a-bew").checked, beleg = null;
+    if (bew) {
+      var total = parseAmount($("b-total").value), tip = parseAmount($("b-tip").value);
+      if (!$("b-place").value.trim()) return fail("Für den Beleg fehlt der Name des Restaurants.", "b-place");
+      if (!$("b-guests").value.trim()) return fail("Für den Beleg fehlen die bewirteten Personen.", "b-guests");
+      if (!$("b-reason").value.trim()) return fail("Für den Beleg fehlt der Anlass. Bitte konkret, z. B. Projektbesprechung.", "b-reason");
+      if (!$("b-host").value.trim()) return fail("Für den Beleg fehlt die bewirtende Person.", "b-host");
+      beleg = {
+        place: $("b-place").value.trim(),
+        address: $("b-address").value.trim(),
+        total: total > 0 ? total : amount - (tip > 0 ? tip : 0),
+        tip: tip > 0 ? tip : 0,
+        guests: $("b-guests").value.split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 30),
+        reason: $("b-reason").value.trim(),
+        host: $("b-host").value.trim(),
+        time: scanned.time || null,
+        invoiceNo: scanned.invoiceNo || null,
+        vat: Array.isArray(scanned.vat) ? scanned.vat.slice(0, 4) : []
+      };
+    }
+    err.hidden = true;
+
+    var btn = $("add-btn");
+    btn.disabled = true;
+    var photoId = null;
+    if (photo && cap.assets) {
+      btn.textContent = "Foto wird gespeichert …";
+      try {
+        var up = await cap.assets.upload(photo.blob, { type: "image/jpeg" });
+        photoId = up.id;
+        photoCache[up.id] = { dataUrl: photo.dataUrl, w: photo.w, h: photo.h };
+      } catch (e2) {
+        setScan("Foto konnte nicht gespeichert werden. Die Ausgabe wird ohne Foto eingetragen.", "bad");
+      }
+    }
+    var exp = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      amount: amount, date: date,
+      note: $("a-note").value.trim().slice(0, 80),
+      excluded: bew && $("a-excl").checked,
+      photo: photoId,
+      beleg: beleg
+    };
+    if (photo && !photoId) photoCache["local-" + exp.id] = { dataUrl: photo.dataUrl, w: photo.w, h: photo.h };
+    if (beleg) state.host = beleg.host;
+    state.expenses.push(exp);
+    save();
+    resetAddForm();
+    btn.disabled = false; btn.textContent = "Eintragen";
+    render();
+    setScan(beleg ? "Eingetragen. Das PDF holst du dir in der Liste." : "", "");
+    $("a-amount").focus();
+  });
+
+  function resetAddForm() {
+    ["a-amount", "a-note", "b-place", "b-address", "b-total", "b-tip", "b-guests", "b-reason"].forEach(function (id) { $(id).value = ""; });
+    $("a-bew").checked = false; $("bew-box").hidden = true; $("a-excl").checked = true;
+    $("a-photo").value = "";
+    photo = null; scanned = {};
+    $("thumb-row").hidden = true; $("a-thumb").removeAttribute("src");
+    $("a-date").value = todayIso();
+  }
+
+  $("a-bew").addEventListener("change", function () {
+    $("bew-box").hidden = !$("a-bew").checked;
+    if ($("a-bew").checked) {
+      if (!$("b-host").value && state.host) $("b-host").value = state.host;
+      if (!$("b-place").value && $("a-note").value) $("b-place").value = $("a-note").value;
+      if (!$("b-total").value && $("a-amount").value) $("b-total").value = $("a-amount").value;
+    }
+  });
+
+  /* ---------- Rechnung scannen ---------- */
+  var scanned = {};
+  function setScan(text, cls) { var s = $("scan-status"); s.textContent = text; s.className = "status" + (cls ? " " + cls : ""); s.hidden = !text; }
+
+  async function setupExtras(c) {
+    try { cap.downloads = await c.use("downloads"); } catch (e) { cap.downloads = null; }
+    try { cap.assets = await c.use("assets"); } catch (e) { cap.assets = null; }
+    try {
+      cap.sample = await c.use("sample");
+      var lim = cap.sample ? await cap.sample.limits().catch(function () { return null; }) : null;
+      if (cap.sample && lim && lim.images) {
+        $("a-photo").accept = lim.images.mediaTypes.join(",");
+        $("scan-box").hidden = false;
+      }
+    } catch (e) { cap.sample = null; }
+    renderList();
+  }
+
+  // Foto verkleinern und als JPEG neu kodieren (kleiner Upload, passt ins PDF)
+  function toJpeg(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var max = 1800, w = img.naturalWidth, h = img.naturalHeight, k = Math.min(1, max / Math.max(w, h));
+        var cv = document.createElement("canvas"); cv.width = Math.round(w * k); cv.height = Math.round(h * k);
+        var ctx = cv.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+        ctx.drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url);
+        var dataUrl = cv.toDataURL("image/jpeg", 0.82);
+        cv.toBlob(function (blob) { blob ? resolve({ blob: blob, dataUrl: dataUrl, w: cv.width, h: cv.height }) : reject(new Error("blob")); }, "image/jpeg", 0.82);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("decode")); };
+      img.src = url;
+    });
+  }
+
+  var SCAN_PROMPT = [
+    "Das Bild zeigt eine Rechnung aus einem Restaurant, Café oder einer Gaststätte, meist aus Deutschland.",
+    "Lies sie aus und antworte nur mit einem JSON-Objekt in genau dieser Form:",
+    '{"ist_rechnung": true, "restaurant": "Name", "anschrift": "Straße Nr, PLZ Ort", "datum": "YYYY-MM-DD", "uhrzeit": "HH:MM",',
+    ' "gesamt": 0.00, "trinkgeld": 0.00, "rechnungsnummer": "…", "mwst": [{"satz": 19, "netto": 0.00, "steuer": 0.00}]}',
+    "Regeln: Beträge als Zahl in Euro mit Punkt als Dezimaltrenner. gesamt = zu zahlender Rechnungsbetrag brutto, ohne Trinkgeld,",
+    "außer das Trinkgeld steht als eigene Zeile auf der Rechnung, dann trinkgeld separat angeben. Was nicht lesbar oder nicht vorhanden ist: null.",
+    "Ist das Bild keine Rechnung, antworte {\"ist_rechnung\": false}."
+  ].join("\n");
+
+  function de(v) { return (Math.round(v * 100) / 100).toFixed(2).replace(".", ","); }
+
+  $("a-photo").addEventListener("change", async function () {
+    var file = this.files && this.files[0];
+    if (!file) return;
+    if (scanCtl) scanCtl.abort();
+    setScan("Foto wird vorbereitet …", "busy");
+    try { photo = await toJpeg(file); }
+    catch (e) { photo = null; setScan("Das Foto ließ sich nicht öffnen. Bitte ein JPEG oder PNG wählen.", "bad"); return; }
+    $("a-thumb").src = photo.dataUrl; $("thumb-row").hidden = false;
+    if (!cap.sample) { setScan("Foto übernommen. Bitte Betrag und Restaurant von Hand eintragen.", ""); return; }
+
+    setScan("Claude liest die Rechnung …", "busy");
+    var ctl = scanCtl = new AbortController();
+    try {
+      var r = await cap.sample.json(SCAN_PROMPT, { images: photo.blob, signal: ctl.signal });
+      if (ctl !== scanCtl) return;
+      if (!r || r.ist_rechnung === false) { setScan("Auf dem Foto wurde keine Rechnung erkannt. Werte bitte von Hand eintragen.", "bad"); return; }
+      var total = Number(r.gesamt), tip = Number(r.trinkgeld);
+      scanned = {
+        time: typeof r.uhrzeit === "string" ? r.uhrzeit.slice(0, 5) : null,
+        invoiceNo: r.rechnungsnummer ? String(r.rechnungsnummer).slice(0, 60) : null,
+        vat: Array.isArray(r.mwst) ? r.mwst.filter(function (v) { return v && isFinite(Number(v.satz)); }).map(function (v) {
+          return { rate: Number(v.satz), net: isFinite(Number(v.netto)) ? Number(v.netto) : null, tax: isFinite(Number(v.steuer)) ? Number(v.steuer) : null };
+        }) : []
+      };
+      var found = [];
+      if (total > 0) { $("a-amount").value = de(total + (tip > 0 ? tip : 0)); $("b-total").value = de(total); found.push("Betrag"); }
+      if (tip > 0) $("b-tip").value = de(tip);
+      if (typeof r.datum === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.datum)) { $("a-date").value = r.datum; found.push("Datum"); }
+      if (r.restaurant) { $("a-note").value = String(r.restaurant).slice(0, 80); $("b-place").value = String(r.restaurant).slice(0, 120); found.push("Restaurant"); }
+      if (r.anschrift) $("b-address").value = String(r.anschrift).slice(0, 160);
+      $("a-bew").checked = true; $("bew-box").hidden = false;
+      if (!$("b-host").value && state.host) $("b-host").value = state.host;
+      setScan(found.length ? "Ausgelesen. Bitte prüfen und Gäste und Anlass ergänzen." : "Kaum etwas lesbar. Bitte von Hand eintragen.", found.length ? "" : "bad");
+      if (found.length) $("b-guests").focus();
+    } catch (e) {
+      if (ctl !== scanCtl || (e && e.code === "cancelled")) return;
+      var code = e && e.code;
+      if (code === "not_granted" || code === "sampling_disabled" || code === "images_unavailable" || code === "not_declared") {
+        setScan("Auslesen ist hier nicht erlaubt. Das Foto bleibt dabei, Werte bitte von Hand eintragen.", "bad");
+      } else if (code === "rate_limited") {
+        setScan("Gerade zu viele Anfragen oder dein Nutzungslimit ist erreicht. Später nochmal versuchen oder von Hand eintragen.", "bad");
+      } else if (code === "image_rejected") {
+        setScan("Dieses Foto kann nicht gelesen werden. Bitte ein anderes Foto wählen.", "bad");
+      } else {
+        setScan("Auslesen hat nicht geklappt. Foto nochmal wählen oder Werte von Hand eintragen.", "bad");
+      }
+    }
+  });
+
+  $("thumb-remove").addEventListener("click", function () {
+    if (scanCtl) { scanCtl.abort(); scanCtl = null; }
+    photo = null; scanned = {}; $("a-photo").value = "";
+    $("thumb-row").hidden = true; $("a-thumb").removeAttribute("src");
+    setScan("", "");
+  });
+
+  /* ---------- Bewirtungsbeleg als PDF ---------- */
+  function loadPhoto(e) {
+    if (photoCache["local-" + e.id]) return Promise.resolve(photoCache["local-" + e.id]);
+    if (!e.photo) return Promise.resolve(null);
+    if (photoCache[e.photo]) return Promise.resolve(photoCache[e.photo]);
+    return fetch("/_blob/" + e.photo).then(function (res) {
+      if (!res.ok) throw new Error("404");
+      return res.blob();
+    }).then(toJpeg).then(function (p) {
+      photoCache[e.photo] = { dataUrl: p.dataUrl, w: p.w, h: p.h };
+      return photoCache[e.photo];
+    }).catch(function () { return null; });
+  }
+
+  async function savePdf(e, btn) {
+    var b = e.beleg;
+    btn.disabled = true; btn.textContent = "…";
+    try {
+      var img = await loadPhoto(e);
+      var doc = new window.jspdf.jsPDF({ unit: "mm", format: "a4" });
+      var L = 20, W = 170, y = 22;
+      function eurTxt(v) { return de(v) + " EUR"; }
+      doc.setFont("helvetica", "bold"); doc.setFontSize(18);
+      doc.text("Bewirtungsbeleg", L, y); y += 6;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90);
+      doc.text("Angaben zum Nachweis der Höhe und der betrieblichen Veranlassung von Bewirtungsaufwendungen", L, y); y += 4;
+      doc.text("(§ 4 Abs. 5 Satz 1 Nr. 2 EStG)", L, y); y += 10;
+      doc.setTextColor(0);
+
+      function row(label, value) {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+        doc.text(label, L, y);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+        var lines = doc.splitTextToSize(value || "–", W - 55);
+        doc.text(lines, L + 55, y);
+        var bottom = y + (Math.max(1, lines.length) - 1) * 5.2 + 2.8;
+        doc.setDrawColor(220); doc.line(L, bottom, L + W, bottom);
+        y = bottom + 6;
+      }
+      var tag = fmtDay(e.date, false) + e.date.slice(0, 4) + (b.time ? ", " + b.time + " Uhr" : "");
+      row("Tag der Bewirtung", tag);
+      row("Ort der Bewirtung", b.place + (b.address ? "\n" + b.address : ""));
+      row("Bewirtende Person", b.host);
+      row("Bewirtete Personen", (b.guests || []).join("\n"));
+      row("Anlass der Bewirtung", b.reason);
+      var vatTxt = (b.vat || []).filter(function (v) { return v.tax !== null; }).map(function (v) {
+        return "MwSt " + v.rate + " %: " + eurTxt(v.tax) + (v.net !== null ? " (netto " + eurTxt(v.net) + ")" : "");
+      }).join("\n");
+      row("Rechnungsbetrag", eurTxt(b.total) + (vatTxt ? "\n" + vatTxt : ""));
+      row("Trinkgeld", b.tip > 0 ? eurTxt(b.tip) : "keins");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("Gesamtbetrag", L, y);
+      doc.setFontSize(12); doc.text(eurTxt(b.total + b.tip), L + 55, y); y += 8;
+      if (b.invoiceNo) { doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90); doc.text("Rechnungsnummer: " + b.invoiceNo, L, y); doc.setTextColor(0); y += 6; }
+
+      y = Math.max(y + 14, 210);
+      if (y > 250) { doc.addPage(); y = 40; }
+      doc.setDrawColor(0);
+      doc.line(L, y, L + 75, y); doc.line(L + 95, y, L + W, y);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      doc.text("Ort, Datum", L, y + 4.5); doc.text("Unterschrift bewirtende Person", L + 95, y + 4.5);
+      if (b.tip > 0) {
+        y += 20;
+        doc.line(L + 95, y, L + W, y);
+        doc.text("Trinkgeld " + eurTxt(b.tip) + " erhalten (Unterschrift Bedienung)", L + 95, y + 4.5);
+      }
+      doc.setFontSize(8); doc.setTextColor(110);
+      doc.text("Bitte die maschinell erstellte Originalrechnung beifügen.", L, 285);
+      doc.setTextColor(0);
+
+      if (img) {
+        doc.addPage();
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+        doc.text("Rechnung (Foto)", L, 18);
+        var maxW = W, maxH = 255, k = Math.min(maxW / img.w, maxH / img.h);
+        doc.addImage(img.dataUrl, "JPEG", L, 24, img.w * k, img.h * k);
+      }
+
+      var safe = (b.place || "Restaurant").replace(/[^A-Za-z0-9ÄÖÜäöüß_-]+/g, "_").slice(0, 40);
+      var blob = doc.output("blob");
+      var fname = "Bewirtungsbeleg_" + e.date + "_" + safe + ".pdf";
+      if (cap.downloads) {
+        await cap.downloads.save({ filename: fname, data: blob });
+      } else {
+        // Außerhalb von Claude (z. B. GitHub Pages): normaler Browser-Download
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+      }
+      btn.textContent = "✓";
+    } catch (err) {
+      var code = err && err.code;
+      btn.textContent = code === "declined" ? "PDF" : "!";
+      if (code && code !== "declined") setSync("PDF konnte nicht gespeichert werden (" + code + ").", true);
+      else if (!code) setSync("PDF konnte nicht erstellt werden.", true);
+    } finally {
+      btn.disabled = false;
+      setTimeout(function () { btn.textContent = "PDF"; }, 2500);
+    }
+  }
+
+  $("trip-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var b = parseAmount($("t-budget").value), s = $("t-start").value, e = $("t-end").value;
+    var err = $("trip-err");
+    if (!(b > 0)) { err.textContent = "Gib ein Budget ein, z. B. 150."; err.hidden = false; return; }
+    if (!s || !e) { err.textContent = "Wähle den ersten und den letzten Abend."; err.hidden = false; return; }
+    if (dayNum(e) < dayNum(s)) { err.textContent = "Der letzte Abend liegt vor dem ersten."; err.hidden = false; return; }
+    err.hidden = true;
+    state.budget = b; state.start = s; state.end = e;
+    save();
+    $("trip-form").querySelector("button[type=submit]").blur();
+    $("settings").open = false;
+    render();
+  });
+  ["t-budget", "t-start", "t-end"].forEach(function (id) { $(id).addEventListener("input", tripHint); });
+
+  // Vorschlag für den Zeitraum, solange nichts gespeichert ist
+  $("t-start").value = todayIso();
+  $("t-end").value = isoOf(dayNum(todayIso()) + 3);
+  tripHint();
+
+  function showReset(on) { $("reset-btn").hidden = on; $("reset-yes").hidden = !on; $("reset-no").hidden = !on; }
+  $("reset-btn").addEventListener("click", function () { showReset(true); });
+  $("reset-no").addEventListener("click", function () { showReset(false); });
+  $("reset-yes").addEventListener("click", function () {
+    state.expenses = []; showReset(false); save(); render();
+  });
+
+  $("trip-line").addEventListener("click", function () { $("settings").open = true; $("settings").scrollIntoView({ behavior: "smooth", block: "start" }); });
+
+  render();
+  connect();
+})();
+</script>
+
+</body>
+</html>
