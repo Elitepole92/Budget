@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Geschäftsreise Budget-Rechner</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --card: #1a2233;
+    --card-2: #212c42;
+    --border: #2e3a55;
+    --text: #e8edf7;
+    --muted: #93a1bd;
+    --accent: #4f8cff;
+    --accent-2: #2f6df0;
+    --green: #2ecc8f;
+    --danger: #ff6b6b;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: linear-gradient(160deg, #0f1420 0%, #141c2c 100%);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 28px; }
+  header h1 { font-size: 1.7rem; letter-spacing: -0.5px; }
+  header p { color: var(--muted); margin-top: 6px; font-size: 0.95rem; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 18px;
+  }
+  .card h2 {
+    font-size: 1.05rem;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+  .field label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 5px;
+    font-weight: 600;
+  }
+  .field input, .field select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--card-2);
+    color: var(--text);
+    font-size: 1rem;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field .hint { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); padding-top: 26px; }
+  .checkbox-row input { width: 17px; height: 17px; accent-color: var(--accent); }
+
+  .range-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .arrow { align-self: end; text-align: center; color: var(--muted); padding-bottom: 10px; }
+
+  .custom-row { display: flex; gap: 10px; align-items: center; }
+  .custom-row input { flex: 1; }
+  .btn {
+    background: var(--accent-2);
+    border: none;
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .btn:hover { background: var(--accent); }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--text); background: transparent; }
+
+  table.list { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 0.92rem; }
+  table.list th { text-align: left; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  table.list td { padding: 8px; border-bottom: 1px solid rgba(46,58,85,.5); }
+  td.del { text-align: right; }
+  .del-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1rem; }
+
+  .summary-card {
+    background: linear-gradient(135deg, #22304d 0%, #1a2233 100%);
+    position: sticky;
+    bottom: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.45);
+  }
+  .summary-rows { display: grid; gap: 8px; margin-bottom: 14px; }
+  .srow { display: flex; justify-content: space-between; font-size: 0.92rem; color: var(--muted); }
+  .srow span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+  .srow.hide { display: none; }
+  .total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  .total .label { font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .total .amount { font-size: 2rem; font-weight: 700; color: var(--green); font-variant-numeric: tabular-nums; }
+  .budget-box { margin-top: 14px; }
+  .budget-box label { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+  .bar { height: 10px; border-radius: 6px; background: var(--card-2); margin-top: 8px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--green); width: 0%; transition: width .3s, background .3s; }
+  .bar-note { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+  .over .bar > div { background: var(--danger); }
+  .under-budget .amount { color: var(--green); }
+  .over-budget .amount { color: var(--danger); }
+
+  .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+  footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 24px; }
+  @media (max-width: 520px) { .range-cols { grid-template-columns: 1fr; } .arrow { display: none; } .checkbox-row { padding-top: 0; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🧳 Geschäftsreise Budget-Rechner</h1>
+    <p>Kosten deiner Reise überschlagen inkl. Verpflegungspauschalen (BRKG-Sätze)</p>
+  </header>
+
+  <div class="card">
+    <h2>🚆 Transport</h2>
+    <div class="grid">
+      <div class="field">
+        <label for="transportArt">Art</label>
+        <select id="transportArt">
+          <option value="Bahn">Bahn</option>
+          <option value="Flug">Flug</option>
+          <option value="Mietwagen">Mietwagen</option>
+          <option value="Privatwagen">Privatwagen (km)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="transportPreis">Hin- & Rückfahrt / Gesamt (€)</label>
+        <input type="number" id="transportPreis" min="0" step="0.01" placeholder="z. B. 180">
+      </div>
+      <div class="field" id="kmField" style="display:none">
+        <label for="km">Strecke (km)</label>
+        <input type="number" id="km" min="0" step="1" placeholder="z. B. 420">
+        <div class="hint">Pauschale 0,30 €/km (einstellbar)</div>
+      </div>
+      <div class="field" id="kmRateField" style="display:none">
+        <label for="kmRate">Cent pro km</label>
+        <input type="number" id="kmRate" min="0" step="0.01" value="30">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🏨 Aufenthalt</h2>
+    <div class="range-cols">
+      <div class="field">
+        <label for="abfahrt">Abfahrt</label>
+        <input type="date" id="abfahrt">
+      </div>
+      <div class="field">
+        <label for="rueckkehr">Rückkehr</label>
+        <input type="date" id="rueckkehr">
+      </div>
+    </div>
+    <div class="grid" style="margin-top:14px">
+      <div class="field">
+        <label for="naechte">Hotel­nächte</label>
+        <input type="number" id="naechte" min="0" step="1" placeholder="z. B. 2">
+      </div>
+      <div class="field">
+        <label for="hotelPreis">Preis pro Nacht (€)</label>
+        <input type="number" id="hotelPreis" min="0" step="0.01" placeholder="z. B. 95">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🍽️ Verpflegung (Pauschalen)</h2>
+    <div class="grid">
+      <div class="field">
+        <label for="volleTage">Volle Tage (24 h unterwegs)</label>
+        <input type="number" id="volleTage" min="0" step="1" value="0">
+        <div class="hint">28 € pro Tag</div>
+      </div>
+      <div class="field">
+        <label for="anreiseTage">An-/Abreisetage</label>
+        <input type="number" id="anreiseTage" min="0" step="1" value="0">
+        <div class="hint">14 € pro Tag</div>
+      </div>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="fruehstück">
+      <label for="fruehstück">Frühstück im Hotel inbegriffen → Pauschale um 20 % kürzen (BRKG-Regel)</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🧾 Sonstige Ausgaben</h2>
+    <div class="grid">
+      <div class="field">
+        <label for="taxi">Taxi / ÖPNV (€)</label>
+        <input type="number" id="taxi" min="0" step="0.01" placeholder="0">
+      </div>
+      <div class="field">
+        <label for="parken">Parken / Maut (€)</label>
+        <input type="number" id="parken" min="0" step="0.01" placeholder="0">
+      </div>
+    </div>
+    <div id="customList"></div>
+    <div class="custom-row" style="margin-top:14px">
+      <input type="text" id="postenName" placeholder="Bezeichnung, z. B. Konferenzgebühr">
+      <input type="number" id="postenBetrag" min="0" step="0.01" placeholder="Betrag €">
+      <button class="btn" id="addPosten">+ Hinzufügen</button>
+    </div>
+  </div>
+
+  <div class="card summary-card" id="summaryCard">
+    <div class="summary-rows">
+      <div class="srow" id="rowTransport"><span>Transport</span><span>0,00 €</span></div>
+      <div class="srow" id="rowHotel"><span>Hotel</span><span>0,00 €</span></div>
+      <div class="srow" id="rowVerpflegung"><span>Verpflegungspauschalen</span><span>0,00 €</span></div>
+      <div class="srow" id="rowTaxi"><span>Taxi / ÖPNV</span><span>0,00 €</span></div>
+      <div class="srow" id="rowParken"><span>Parken / Maut</span><span>0,00 €</span></div>
+      <div class="srow" id="rowCustom"><span>Sonstiges</span><span>0,00 €</span></div>
+    </div>
+    <div class="total under-budget" id="totalBox">
+      <span class="label">Gesamtkosten</span>
+      <span class="amount" id="total">0,00 €</span>
+    </div>
+    <div class="budget-box">
+      <label for="budget">Vergleichsbudget (€, optional)</label>
+      <input type="number" id="budget" min="0" step="0.01" placeholder="z. B. Reisebudget der Firma" style="margin-top:5px">
+      <div class="bar"><div id="barFill"></div></div>
+      <div class="bar-note" id="barNote"></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost" id="reset">Zurücksetzen</button>
+      <button class="btn" id="print">Drucken / PDF</button>
+    </div>
+  </div>
+
+  <footer>Angaben unverbindlich – Verpflegungspauschalen nach § 9 BRKG (28 € / 14 €). Werte bleiben lokal im Browser gespeichert.</footer>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const num = (id) => { const v = parseFloat($(id).value); return isNaN(v) ? 0 : v; };
+  const eur = (v) => v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
+  const KEYS = ['transportArt','transportPreis','km','kmRate','abfahrt','rueckkehr','naechte','hotelPreis','volleTage','anreiseTage','fruehstück','taxi','parken','budget'];
+  const STORAGE = 'reisebudget-v1';
+  let custom = [];
+
+  function save() {
+    const data = { custom };
+    KEYS.forEach(k => { const el = $(k); data[k] = el.type === 'checkbox' ? el.checked : el.value; });
+    localStorage.setItem(STORAGE, JSON.stringify(data));
+  }
+  function load() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE) || '{}');
+      custom = Array.isArray(data.custom) ? data.custom : [];
+      KEYS.forEach(k => { if (data[k] !== undefined && $(k)) { if ($(k).type === 'checkbox') $(k).checked = data[k]; else $(k).value = data[k]; } });
+      renderCustom();
+    } catch (e) { custom = []; }
+  }
+
+  function autoTage() {
+    const a = $('abfahrt').value, r = $('rueckkehr').value;
+    if (!a || !r) return;
+    const d1 = new Date(a), d2 = new Date(r);
+    if (d2 < d1) return;
+    const tage = Math.round((d2 - d1) / 86400000) + 1;
+    if (tage <= 1) {
+      $('volleTage').value = 0;
+      $('anreiseTage').value = tage;
+    } else {
+      $('volleTage').value = tage - 2;
+      $('anreiseTage').value = 2;
+    }
+  }
+
+  function berechneTransport() {
+    if ($('transportArt').value === 'Privatwagen') {
+      return num('km') * num('kmRate') / 100;
+    }
+    return num('transportPreis');
+  }
+
+  function berechneVerpflegung() {
+    const volle = num('volleTage') * 28;
+    const rand = num('anreiseTage') * 14;
+    const sum = volle + rand;
+    return $('fruehstück').checked ? sum * 0.8 : sum;
+  }
+
+  function berechne() {
+    const transport = berechneTransport();
+    const hotel = num('naechte') * num('hotelPreis');
+    const verpflegung = berechneVerpflegung();
+    const taxi = num('taxi');
+    const parken = num('parken');
+    const sonst = custom.reduce((s, p) => s + p.betrag, 0);
+    const total = transport + hotel + verpflegung + taxi + parken + sonst;
+
+    $('rowTransport').lastElementChild.textContent = eur(transport);
+    $('rowHotel').lastElementChild.textContent = eur(hotel);
+    $('rowVerpflegung').lastElementChild.textContent = eur(verpflegung);
+    $('rowTaxi').lastElementChild.textContent = eur(taxi);
+    $('rowParken').lastElementChild.textContent = eur(parken);
+    $('rowCustom').lastElementChild.textContent = eur(sonst);
+    $('rowCustom').classList.toggle('hide', custom.length === 0);
+    $('rowTaxi').classList.toggle('hide', taxi === 0);
+    $('rowParken').classList.toggle('hide', parken === 0);
+    $('total').textContent = eur(total);
+
+    const budget = num('budget');
+    const fill = $('barFill');
+    if (budget > 0) {
+      const pct = Math.min(total / budget * 100, 100);
+      fill.style.width = pct + '%';
+      const diff = budget - total;
+      $('barNote').textContent = diff >= 0
+        ? eur(diff) + ' unter dem Budget'
+        : eur(-diff) + ' ÜBER dem Budget!';
+      $('totalBox').className = 'total ' + (diff >= 0 ? 'under-budget' : 'over-budget');
+      fill.style.background = diff >= 0 ? 'var(--green)' : 'var(--danger)';
+    } else {
+      fill.style.width = '0%';
+      $('barNote').textContent = '';
+      $('totalBox').className = 'total under-budget';
+    }
+    save();
+  }
+
+  function renderCustom() {
+    const list = $('customList');
+    if (custom.length === 0) { list.innerHTML = ''; return; }
+    let html = '<table class="list"><tr><th>Posten</th><th style="text-align:right">Betrag</th><th></th></tr>';
+    custom.forEach((p, i) => {
+      html += '<tr><td>' + p.name + '</td><td style="text-align:right">' + eur(p.betrag) + '</td><td class="del"><button class="del-btn" data-i="' + i + '" title="Entfernen">✕</button></td></tr>';
+    });
+    list.innerHTML = html + '</table>';
+    list.querySelectorAll('.del-btn').forEach(b => b.addEventListener('click', () => {
+      custom.splice(parseInt(b.dataset.i, 10), 1);
+      renderCustom();
+      berechne();
+    }));
+  }
+
+  function toggleKm() {
+    const show = $('transportArt').value === 'Privatwagen';
+    $('kmField').style.display = show ? '' : 'none';
+    $('kmRateField').style.display = show ? '' : 'none';
+    $('transportPreis').disabled = show;
+  }
+
+  ['transportArt','transportPreis','km','kmRate','naechte','hotelPreis','volleTage','anreiseTage','fruehstück','taxi','parken','budget']
+    .forEach(id => { $(id).addEventListener('input', () => { toggleKm(); berechne(); }); });
+
+  ['abfahrt','rueckkehr'].forEach(id => $(id).addEventListener('change', () => { autoTage(); berechne(); }));
+
+  $('addPosten').addEventListener('click', () => {
+    const name = $('postenName').value.trim();
+    const betrag = parseFloat($('postenBetrag').value);
+    if (!name || isNaN(betrag) || betrag <= 0) return;
+    custom.push({ name, betrag });
+    $('postenName').value = '';
+    $('postenBetrag').value = '';
+    renderCustom();
+    berechne();
+  });
+  $('postenBetrag').addEventListener('keydown', e => { if (e.key === 'Enter') $('addPosten').click(); });
+
+  $('reset').addEventListener('click', () => {
+    if (!confirm('Alle Eingaben zurücksetzen?')) return;
+    localStorage.removeItem(STORAGE);
+    location.reload();
+  });
+
+  $('print').addEventListener('click', () => window.print());
+
+  load();
+  toggleKm();
+  berechne();
+})();
+</script>
+</body>
+</html>
