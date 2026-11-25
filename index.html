@@ -161,6 +161,10 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
 .sig-pad { width: 100%; height: 180px; background: #ffffff; border: 1px solid var(--line); border-radius: 12px; touch-action: none; display: block; }
 .sig-actions { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; }
 .sig-row { display: flex; justify-content: space-between; gap: 12px; }
+.pv-box { max-height: calc(100vh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); grid-template-rows: auto 1fr auto auto; }
+.pv-pages { overflow-y: auto; min-height: 200px; max-height: 68vh; background: var(--bg); border-radius: 12px; padding: 10px; display: grid; gap: 10px; align-content: start; }
+.pv-pages canvas { width: 100%; height: auto; background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18); display: block; }
+.pv-pages .hint { text-align: center; padding: 24px 8px; }
 </style>
 
 <div class="wrap">
@@ -252,6 +256,18 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
   </details>
 
   <p class="sync" id="sync" hidden></p>
+</div>
+
+<div class="sheet" id="pv-sheet" role="dialog" aria-modal="true" aria-labelledby="pv-title" hidden>
+  <div class="sheet-box pv-box">
+    <h2 id="pv-title">Vorschau Bewirtungsbeleg</h2>
+    <div class="pv-pages" id="pv-pages"></div>
+    <p class="err" id="pv-err" hidden></p>
+    <div class="sig-actions">
+      <button type="button" class="link" id="pv-back">Abbrechen</button>
+      <button type="button" class="primary" id="pv-save">Speichern / Teilen</button>
+    </div>
+  </div>
 </div>
 
 <div class="sheet" id="sig-sheet" role="dialog" aria-modal="true" aria-labelledby="sig-title" hidden>
@@ -736,10 +752,9 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
     }).catch(function () { return null; });
   }
 
-  async function savePdf(e, btn, sig) {
+  async function makePdf(e, sig) {
     var b = e.beleg;
-    btn.disabled = true; btn.textContent = "…";
-    try {
+    {
       var img = await loadPhoto(e);
       var doc = new window.jspdf.jsPDF({ unit: "mm", format: "a4" });
       var L = 20, W = 170, y = 22;
@@ -809,28 +824,96 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
       }
 
       var safe = (b.place || "Restaurant").replace(/[^A-Za-z0-9ÄÖÜäöüß_-]+/g, "_").slice(0, 40);
-      var blob = doc.output("blob");
-      var fname = "Bewirtungsbeleg_" + e.date + "_" + safe + ".pdf";
+      return { blob: doc.output("blob"), fname: "Bewirtungsbeleg_" + e.date + "_" + safe + ".pdf" };
+    }
+  }
+
+  /* ---------- Vorschau ---------- */
+  var PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+  var pdfjsReady = null, pending = null;
+  function loadScript(src) {
+    return new Promise(function (res, rej) {
+      var t = document.createElement("script"); t.src = src; t.onload = res; t.onerror = rej; document.head.appendChild(t);
+    });
+  }
+  function loadPdfjs() {
+    if (!pdfjsReady) {
+      // Worker-Code als normales Skript laden: pdf.js rechnet dann im Hauptthread
+      pdfjsReady = loadScript(PDFJS + "pdf.min.js").then(function () { return loadScript(PDFJS + "pdf.worker.min.js"); }).then(function () {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js";
+        return window.pdfjsLib;
+      });
+      pdfjsReady.catch(function () { pdfjsReady = null; });
+    }
+    return pdfjsReady;
+  }
+  async function renderPreview(blob) {
+    var box = $("pv-pages");
+    box.textContent = "";
+    var wait = document.createElement("p"); wait.className = "hint"; wait.textContent = "Vorschau wird erstellt …"; box.appendChild(wait);
+    try {
+      var lib = await loadPdfjs();
+      var pdf = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+      box.textContent = "";
+      var cssW = box.clientWidth - 20, dpr = Math.min(2, window.devicePixelRatio || 1);
+      for (var n = 1; n <= pdf.numPages; n++) {
+        var page = await pdf.getPage(n);
+        var vp = page.getViewport({ scale: cssW / page.getViewport({ scale: 1 }).width * dpr });
+        var cv = document.createElement("canvas"); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+        cv.setAttribute("aria-label", "Seite " + n);
+        box.appendChild(cv);
+        await page.render({ canvasContext: cv.getContext("2d"), viewport: vp }).promise;
+      }
+    } catch (err) {
+      box.textContent = "";
+      var p = document.createElement("p"); p.className = "hint"; p.textContent = "Vorschau konnte nicht angezeigt werden. Speichern geht trotzdem."; box.appendChild(p);
+    }
+  }
+  async function previewPdf(e, btn, sig) {
+    btn.disabled = true; btn.textContent = "…";
+    try {
+      pending = await makePdf(e, sig);
+      pending.btn = btn;
+      $("pv-err").hidden = true;
+      $("pv-sheet").hidden = false;
+      $("pv-save").disabled = false;
+      $("pv-save").focus();
+      renderPreview(pending.blob);
+    } catch (err) {
+      setSync("PDF konnte nicht erstellt werden.", true);
+    } finally {
+      btn.disabled = false; btn.textContent = "PDF";
+    }
+  }
+  function closePreview() {
+    $("pv-sheet").hidden = true; $("pv-pages").textContent = "";
+    var f = pending; pending = null;            // PDF samt Unterschrift verwerfen
+    if (f && f.btn) f.btn.focus();
+  }
+  async function sharePdf() {
+    if (!pending) return;
+    var f = pending;
+    $("pv-save").disabled = true;
+    try {
       if (cap.downloads) {
-        await cap.downloads.save({ filename: fname, data: blob });
+        await cap.downloads.save({ filename: f.fname, data: f.blob });
       } else {
         // Außerhalb von Claude (z. B. GitHub Pages): normaler Browser-Download
         var a = document.createElement("a");
-        a.href = URL.createObjectURL(blob); a.download = fname;
+        a.href = URL.createObjectURL(f.blob); a.download = f.fname;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
       }
-      btn.textContent = "✓";
+      closePreview();
     } catch (err) {
       var code = err && err.code;
-      btn.textContent = code === "declined" ? "PDF" : "!";
-      if (code && code !== "declined") setSync("PDF konnte nicht gespeichert werden (" + code + ").", true);
-      else if (!code) setSync("PDF konnte nicht erstellt werden.", true);
-    } finally {
-      btn.disabled = false;
-      setTimeout(function () { btn.textContent = "PDF"; }, 2500);
+      $("pv-save").disabled = false;
+      if (code !== "declined") { $("pv-err").textContent = "Speichern hat nicht geklappt" + (code ? " (" + code + ")" : "") + "."; $("pv-err").hidden = false; }
     }
   }
+  $("pv-back").addEventListener("click", closePreview);
+  $("pv-save").addEventListener("click", sharePdf);
+  $("pv-sheet").addEventListener("keydown", function (ev) { if (ev.key === "Escape") closePreview(); });
 
   /* ---------- Unterschrift (nur im Speicher, nach dem PDF verworfen) ---------- */
   var sigFor = null, sigInk = false, sigBox = null;
@@ -886,11 +969,11 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
   function closeSig() { clearPad(); $("sig-sheet").hidden = true; var f = sigFor; sigFor = null; if (f) f.btn.focus(); }
   $("sig-clear").addEventListener("click", clearPad);
   $("sig-cancel").addEventListener("click", closeSig);
-  $("sig-skip").addEventListener("click", function () { var f = sigFor; closeSig(); if (f) savePdf(f.e, f.btn, null); });
+  $("sig-skip").addEventListener("click", function () { var f = sigFor; closeSig(); if (f) previewPdf(f.e, f.btn, null); });
   $("sig-ok").addEventListener("click", function () {
     var f = sigFor, img = sigImage();
     closeSig();                      // Zeichenfläche leeren, bevor das PDF entsteht
-    if (f) savePdf(f.e, f.btn, img); // img lebt nur in diesem Aufruf
+    if (f) previewPdf(f.e, f.btn, img); // img lebt nur in diesem PDF
   });
   $("sig-sheet").addEventListener("keydown", function (ev) { if (ev.key === "Escape") closeSig(); });
 
