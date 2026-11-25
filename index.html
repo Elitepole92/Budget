@@ -703,7 +703,9 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
         time: typeof r.uhrzeit === "string" ? r.uhrzeit.slice(0, 5) : null,
         invoiceNo: r.rechnungsnummer ? String(r.rechnungsnummer).slice(0, 60) : null,
         vat: Array.isArray(r.mwst) ? r.mwst.filter(function (v) { return v && isFinite(Number(v.satz)); }).map(function (v) {
-          return { rate: Number(v.satz), net: isFinite(Number(v.netto)) ? Number(v.netto) : null, tax: isFinite(Number(v.steuer)) ? Number(v.steuer) : null };
+          // null/leer darf nicht zu 0 werden (Number(null) === 0)
+          function amt(x) { var n = (x === null || x === undefined || x === "") ? NaN : Number(x); return n > 0 ? n : null; }
+          return { rate: Number(v.satz), net: amt(v.netto), tax: amt(v.steuer) };
         }) : []
       };
       var found = [];
@@ -782,8 +784,10 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
       row("Bewirtende Person", b.host);
       row("Bewirtete Personen", (b.guests || []).join("\n"));
       row("Anlass der Bewirtung", b.reason);
-      var vatTxt = (b.vat || []).filter(function (v) { return v.tax !== null; }).map(function (v) {
-        return "MwSt " + v.rate + " %: " + eurTxt(v.tax) + (v.net !== null ? " (netto " + eurTxt(v.net) + ")" : "");
+      var vatTxt = (b.vat || []).filter(function (v) { return v.tax > 0; }).map(function (v) {
+        // fehlenden Nettobetrag aus Steuer und Satz berechnen (auch für alte Belege mit 0)
+        var net = v.net > 0 ? v.net : (v.rate > 0 ? Math.round(v.tax * 100 / v.rate * 100) / 100 : null);
+        return "MwSt " + v.rate + " %: " + eurTxt(v.tax) + (net ? " (netto " + eurTxt(net) + ")" : "");
       }).join("\n");
       row("Rechnungsbetrag", eurTxt(b.total) + (vatTxt ? "\n" + vatTxt : ""));
       row("Trinkgeld", b.tip > 0 ? eurTxt(b.tip) : "keins");
