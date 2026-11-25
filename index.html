@@ -150,6 +150,31 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
 
 .sync { font-size: 13px; color: var(--warn); }
 
+/* Übersicht */
+.view { display: grid; gap: 14px; }
+.plist { display: grid; gap: 10px; }
+.pcard {
+  text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+  padding: 16px; display: grid; gap: 8px; font-weight: 400; color: var(--ink);
+}
+.pcard:hover { border-color: var(--accent); }
+.pcard .ptop { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.pcard .pn { font: 600 17px var(--font-display); overflow-wrap: anywhere; min-width: 0; }
+.pcard .pr { font: 600 20px var(--font-display); white-space: nowrap; }
+.pcard .pr.neg { color: var(--crit); }
+.pcard .pd { font-size: 13px; color: var(--muted); }
+.pcard .pd b { font-weight: 600; }
+.pcard .pd b.warn { color: var(--warn); }
+.pcard .pd b.crit { color: var(--crit); }
+.pcard .meter { height: 6px; }
+.add-proj { border: 1.5px dashed var(--line); border-radius: 16px; padding: 14px; color: var(--accent); font-size: 15px; }
+.add-proj:hover { border-color: var(--accent); }
+.beleg-card h2 { font: 600 17px var(--font-display); margin: 0 0 2px; }
+.back { font-size: 15px; padding: 0; justify-self: start; }
+.view header { flex-wrap: wrap; }
+.view header h1 { overflow-wrap: anywhere; min-width: 0; }
+.reset .danger-link { color: var(--crit); }
+
 /* Unterschrift – nur für den Moment, wird nie gespeichert */
 .sheet {
   position: fixed; inset: 0; z-index: 20; background: rgba(8, 18, 22, 0.55);
@@ -168,8 +193,23 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
 </style>
 
 <div class="wrap">
+  <section class="view" id="v-home">
+    <header><h1>Abendbudget</h1></header>
+    <div class="plist" id="plist"><p class="hint">Lade …</p></div>
+    <button type="button" class="add-proj" id="new-project">+ Neues Projekt</button>
+    <section class="card beleg-card">
+      <div>
+        <h2>Bewirtungsbeleg ohne Projekt</h2>
+        <p class="hint" id="belege-count">Für Geschäftsessen außerhalb einer Reise.</p>
+      </div>
+      <button type="button" class="primary" id="go-belege">Bewirtungsbeleg erstellen</button>
+    </section>
+  </section>
+
+  <section class="view" id="v-proj" hidden>
+  <button type="button" class="link back" id="back">‹ Übersicht</button>
   <header>
-    <h1>Abendbudget</h1>
+    <h1 id="proj-title">Projekt</h1>
     <button type="button" class="trip num" id="trip-line">Reise festlegen</button>
   </header>
 
@@ -210,7 +250,7 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
         <input id="a-note" maxlength="80" autocomplete="off" placeholder="Wo? (optional)" aria-label="Wo oder was">
         <input id="a-date" type="date" aria-label="Abend">
       </div>
-      <label class="check"><input type="checkbox" id="a-bew">Geschäftsessen mit Bewirtungsbeleg</label>
+      <label class="check" id="bew-check-row"><input type="checkbox" id="a-bew">Geschäftsessen mit Bewirtungsbeleg</label>
       <fieldset class="bew" id="bew-box" hidden>
         <legend class="vh">Bewirtungsbeleg</legend>
         <textarea id="b-guests" rows="2" maxlength="800" placeholder="Gäste: Name, Firma (je Zeile)" aria-label="Bewirtete Personen"></textarea>
@@ -222,7 +262,7 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
           <input id="b-total" class="num" inputmode="decimal" autocomplete="off" placeholder="Rechnung €" aria-label="Rechnungsbetrag in Euro">
           <input id="b-tip" class="num" inputmode="decimal" autocomplete="off" placeholder="Trinkgeld €" aria-label="Trinkgeld in Euro">
         </div>
-        <label class="check"><input type="checkbox" id="a-excl" checked>Nicht aufs Abendbudget anrechnen</label>
+        <label class="check" id="excl-row"><input type="checkbox" id="a-excl" checked>Nicht aufs Abendbudget anrechnen</label>
       </fieldset>
       <p class="err" id="add-err" hidden></p>
       <button type="submit" class="primary" id="add-btn">Eintragen</button>
@@ -234,8 +274,12 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
   </section>
 
   <details class="settings card" id="settings">
-    <summary>Reise ändern</summary>
+    <summary>Projekt bearbeiten</summary>
     <form id="trip-form" novalidate>
+      <div class="field">
+        <label for="t-name">Name</label>
+        <input id="t-name" maxlength="60" autocomplete="off" placeholder="z. B. Messe Hannover">
+      </div>
       <div class="field">
         <label for="t-budget">Budget gesamt in €</label>
         <input id="t-budget" class="num" inputmode="decimal" autocomplete="off" placeholder="z. B. 150">
@@ -253,7 +297,13 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
       <button type="button" class="danger" id="reset-yes" hidden>Ja, löschen</button>
       <button type="button" class="link" id="reset-no" hidden>Abbrechen</button>
     </div>
+    <div class="reset">
+      <button type="button" class="link danger-link" id="del-btn">Projekt löschen</button>
+      <button type="button" class="danger" id="del-yes" hidden>Ja, Projekt löschen</button>
+      <button type="button" class="link" id="del-no" hidden>Abbrechen</button>
+    </div>
   </details>
+  </section>
 
   <p class="sync" id="sync" hidden></p>
 </div>
@@ -294,7 +344,14 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
   var LOCAL_KEY = "abendbudget-local";
 
   /* ---------- Zustand ---------- */
-  var state = { budget: null, start: null, end: null, host: "", expenses: [] };
+  var data = { host: "", projects: [], belege: [] };   // alles, was gespeichert wird
+  var view = "home";                                    // "home" | "proj" | "belege"
+  var state = newProject("");                           // das gerade offene Projekt (oder die Belegliste)
+  function newProject(name) {
+    return { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: name, budget: null, start: null, end: null, expenses: [] };
+  }
+  function findProject(id) { for (var i = 0; i < data.projects.length; i++) if (data.projects[i].id === id) return data.projects[i]; return null; }
+  function setExpenses(list) { state.expenses = list; if (view === "belege") data.belege = list; }
   var store = null;          // { save(state) } – db oder lokal
   var writing = Promise.resolve();
   var cap = { sample: null, assets: null, downloads: null };
@@ -324,8 +381,8 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
   function plural(n, one, many) { return n === 1 ? one : many; }
 
   /* ---------- Rechnung ---------- */
-  function compute() {
-    var s = state;
+  function compute(s) {
+    s = s || state;
     if (!(s.budget > 0) || !s.start || !s.end || dayNum(s.end) < dayNum(s.start)) return null;
     var first = dayNum(s.start), last = dayNum(s.end), today = dayNum(todayIso());
     var evenings = last - first + 1;
@@ -357,7 +414,7 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
   }
 
   /* ---------- Darstellung ---------- */
-  function render() {
+  function renderProject() {
     var r = compute();
     var s = state;
 
@@ -401,6 +458,87 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
     renderList();
   }
 
+  function render() {
+    $("v-home").hidden = view !== "home";
+    $("v-proj").hidden = view === "home";
+    if (view === "home") { renderHome(); return; }
+    var bel = view === "belege";
+    $("proj-title").textContent = bel ? "Bewirtungsbelege" : (state.name || "Projekt");
+    $("trip-line").hidden = bel; $("status").hidden = bel; $("settings").hidden = bel;
+    $("bew-check-row").hidden = bel; $("excl-row").hidden = bel;
+    $("a-amount").placeholder = bel ? "Gesamtbetrag €" : "Betrag €";
+    $("a-note").hidden = bel;
+    if (!$("add-btn").disabled) $("add-btn").textContent = bel ? "Beleg speichern" : "Eintragen";
+    if (bel) { $("a-bew").checked = true; $("bew-box").hidden = false; renderList(); return; }
+    if (!$("trip-form").contains(document.activeElement)) $("t-name").value = state.name || "";
+    renderProject();
+  }
+
+  function renderHome() {
+    var box = $("plist");
+    box.textContent = "";
+    var ps = data.projects.slice().sort(function (a, b) { return (b.start || "9").localeCompare(a.start || "9"); });
+    if (!ps.length) {
+      var h = document.createElement("p"); h.className = "hint";
+      h.textContent = "Noch keine Projekte. Leg eins an, z. B. für die nächste Geschäftsreise.";
+      box.appendChild(h);
+    }
+    ps.forEach(function (p) {
+      var r = compute(p);
+      var c = document.createElement("button"); c.type = "button"; c.className = "pcard";
+      var top = document.createElement("div"); top.className = "ptop";
+      var n = document.createElement("span"); n.className = "pn"; n.textContent = p.name || "Projekt";
+      var rest = document.createElement("span"); rest.className = "pr num" + (r && r.left < 0 ? " neg" : "");
+      rest.textContent = r ? money(r.left) : "–";
+      top.appendChild(n); top.appendChild(rest); c.appendChild(top);
+      if (r) {
+        var m = document.createElement("div"); m.className = "meter";
+        var f = document.createElement("div"); var em = emptyDay(r);
+        f.className = "fill" + (em.level ? " " + em.level : "");
+        f.style.width = Math.min(100, Math.max(0, r.spent / p.budget * 100)) + "%";
+        m.appendChild(f); c.appendChild(m);
+        var d = document.createElement("p"); d.className = "pd num";
+        d.appendChild(document.createTextNode(fmtDay(p.start, false) + "–" + fmtDay(p.end, false) + " · Aufgebraucht am: "));
+        var b = document.createElement("b"); b.className = em.level; b.textContent = em.text; d.appendChild(b);
+        c.appendChild(d);
+      } else {
+        var d2 = document.createElement("p"); d2.className = "pd"; d2.textContent = "Budget und Zeitraum fehlen noch";
+        c.appendChild(d2);
+      }
+      c.addEventListener("click", function () { go("p-" + p.id); });
+      box.appendChild(c);
+    });
+    var nb = data.belege.length;
+    $("belege-count").textContent = nb ? nb + " " + plural(nb, "Beleg", "Belege") + " gespeichert" : "Für Geschäftsessen außerhalb einer Reise.";
+  }
+
+  /* ---------- Navigation (über #-Anker, damit Zurück funktioniert) ---------- */
+  function bindView() {
+    var h = (location.hash || "").slice(1);
+    if (h === "belege") {
+      view = "belege";
+      state = { id: "belege", name: "", budget: null, start: null, end: null, expenses: data.belege };
+    } else if (h.indexOf("p-") === 0 && findProject(h.slice(2))) {
+      view = "proj"; state = findProject(h.slice(2));
+    } else {
+      view = "home";
+    }
+  }
+  function route() {
+    bindView();
+    pendingDelete = null; showReset(false); showDel(false);
+    $("add-err").hidden = true; $("trip-err").hidden = true;
+    if (view === "proj") {
+      $("settings").open = !(state.budget > 0);
+      if (!state.start) { $("t-budget").value = ""; $("t-start").value = todayIso(); $("t-end").value = isoOf(dayNum(todayIso()) + 3); }
+    }
+    resetAddForm(); setScan("", "");
+    render();
+    window.scrollTo(0, 0);
+  }
+  function go(name) { if (location.hash !== "#" + name) location.hash = name; else route(); }
+  window.addEventListener("hashchange", route);
+
   // Wann ist das Budget im bisherigen Tempo leer?
   function emptyDay(r) {
     if (r.left <= 0) return { text: "schon aufgebraucht", level: "crit" };
@@ -421,7 +559,7 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
     if (!state.expenses.length) {
       var p = document.createElement("p");
       p.className = "empty";
-      p.textContent = "Noch nichts eingetragen.";
+      p.textContent = view === "belege" ? "Noch keine Belege ohne Projekt." : "Noch nichts eingetragen.";
       list.appendChild(p);
       return;
     }
@@ -435,7 +573,7 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
       items.forEach(function (e) {
         var row = document.createElement("div"); row.className = "item" + (e.excluded ? " out" : "");
         var note = document.createElement("span"); note.className = "note" + (e.note ? "" : " none"); note.textContent = e.note || "Abendessen";
-        if (e.beleg || e.excluded) {
+        if ((e.beleg && view !== "belege") || e.excluded) {
           var t = document.createElement("small");
           t.textContent = e.beleg ? (e.excluded ? "Bewirtung, nicht angerechnet" : "Bewirtung") : "nicht angerechnet";
           note.appendChild(t);
@@ -460,7 +598,7 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
         del.addEventListener("click", function () {
           if (pendingDelete === e.id) {
             pendingDelete = null;
-            state.expenses = state.expenses.filter(function (x) { return x.id !== e.id; });
+            setExpenses(state.expenses.filter(function (x) { return x.id !== e.id; }));
             save(); render();
           } else {
             pendingDelete = e.id; renderList();
@@ -483,7 +621,7 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
 
   /* ---------- Speichern ---------- */
   function snapshotState() {
-    return { budget: state.budget, start: state.start, end: state.end, host: state.host, expenses: state.expenses.slice(), updated: new Date().toISOString() };
+    return JSON.parse(JSON.stringify({ version: 2, host: data.host, projects: data.projects, belege: data.belege, updated: new Date().toISOString() }));
   }
   function save() {
     if (!store) return;
@@ -496,13 +634,8 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
   }
   function setSync(text, warn) { $("sync").textContent = text; $("sync").hidden = !warn; }
 
-  function applyRemote(d) {
-    if (!d) return;
-    state.budget = typeof d.budget === "number" ? d.budget : null;
-    state.start = typeof d.start === "string" ? d.start : null;
-    state.end = typeof d.end === "string" ? d.end : null;
-    state.host = typeof d.host === "string" ? d.host : "";
-    state.expenses = Array.isArray(d.expenses) ? d.expenses.filter(function (e) {
+  function cleanExpenses(list) {
+    return Array.isArray(list) ? list.filter(function (e) {
       return e && typeof e.amount === "number" && typeof e.date === "string";
     }).map(function (e) {
       return {
@@ -513,7 +646,31 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
         beleg: e.beleg && typeof e.beleg === "object" ? e.beleg : null
       };
     }) : [];
-    if (!$("b-host").value && state.host) $("b-host").value = state.host;
+  }
+  function cleanProject(p, fallbackId) {
+    return {
+      id: typeof p.id === "string" && /^[A-Za-z0-9]+$/.test(p.id) ? p.id : fallbackId,
+      name: typeof p.name === "string" ? p.name.slice(0, 60) : "Projekt",
+      budget: typeof p.budget === "number" ? p.budget : null,
+      start: typeof p.start === "string" ? p.start : null,
+      end: typeof p.end === "string" ? p.end : null,
+      expenses: cleanExpenses(p.expenses)
+    };
+  }
+  function applyRemote(d) {
+    if (!d) return;
+    data.host = typeof d.host === "string" ? d.host : "";
+    if (Array.isArray(d.projects)) {
+      data.projects = d.projects.filter(function (p) { return p && typeof p === "object"; }).map(function (p, k) { return cleanProject(p, "p" + k); });
+      data.belege = cleanExpenses(d.belege);
+    } else {
+      // Ältere Version mit nur einem Budget: wird zum ersten Projekt
+      var old = typeof d.budget === "number" || (Array.isArray(d.expenses) && d.expenses.length);
+      data.projects = old ? [cleanProject({ id: "reise1", name: "Meine Reise", budget: d.budget, start: d.start, end: d.end, expenses: d.expenses }, "reise1")] : [];
+      data.belege = [];
+    }
+    if (!$("b-host").value && data.host) $("b-host").value = data.host;
+    bindView();
     render();
   }
 
@@ -600,17 +757,17 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
     var exp = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       amount: amount, date: date,
-      note: $("a-note").value.trim().slice(0, 80),
-      excluded: bew && $("a-excl").checked,
+      note: (view === "belege" ? "" : $("a-note").value.trim()).slice(0, 80) || (beleg ? beleg.place.slice(0, 80) : ""),
+      excluded: view !== "belege" && bew && $("a-excl").checked,
       photo: photoId,
       beleg: beleg
     };
     if (photo && !photoId) photoCache["local-" + exp.id] = { dataUrl: photo.dataUrl, w: photo.w, h: photo.h };
-    if (beleg) state.host = beleg.host;
+    if (beleg) data.host = beleg.host;
     state.expenses.push(exp);
     save();
     resetAddForm();
-    btn.disabled = false; btn.textContent = "Eintragen";
+    btn.disabled = false;
     render();
     setScan(beleg ? "Eingetragen. Das PDF holst du dir in der Liste." : "", "");
     $("a-amount").focus();
@@ -628,7 +785,7 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
   $("a-bew").addEventListener("change", function () {
     $("bew-box").hidden = !$("a-bew").checked;
     if ($("a-bew").checked) {
-      if (!$("b-host").value && state.host) $("b-host").value = state.host;
+      if (!$("b-host").value && data.host) $("b-host").value = data.host;
       if (!$("b-place").value && $("a-note").value) $("b-place").value = $("a-note").value;
       if (!$("b-total").value && $("a-amount").value) $("b-total").value = $("a-amount").value;
     }
@@ -715,7 +872,7 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
       if (r.restaurant) { $("a-note").value = String(r.restaurant).slice(0, 80); $("b-place").value = String(r.restaurant).slice(0, 120); found.push("Restaurant"); }
       if (r.anschrift) $("b-address").value = String(r.anschrift).slice(0, 160);
       $("a-bew").checked = true; $("bew-box").hidden = false;
-      if (!$("b-host").value && state.host) $("b-host").value = state.host;
+      if (!$("b-host").value && data.host) $("b-host").value = data.host;
       setScan(found.length ? "Ausgelesen. Bitte prüfen und Gäste und Anlass ergänzen." : "Kaum etwas lesbar. Bitte von Hand eintragen.", found.length ? "" : "bad");
       if (found.length) $("b-guests").focus();
     } catch (e) {
@@ -990,6 +1147,7 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
     if (dayNum(e) < dayNum(s)) { err.textContent = "Der letzte Abend liegt vor dem ersten."; err.hidden = false; return; }
     err.hidden = true;
     state.budget = b; state.start = s; state.end = e;
+    state.name = $("t-name").value.trim().slice(0, 60) || state.name || "Projekt";
     save();
     $("trip-form").querySelector("button[type=submit]").blur();
     $("settings").open = false;
@@ -1006,11 +1164,30 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
   $("reset-btn").addEventListener("click", function () { showReset(true); });
   $("reset-no").addEventListener("click", function () { showReset(false); });
   $("reset-yes").addEventListener("click", function () {
-    state.expenses = []; showReset(false); save(); render();
+    setExpenses([]); showReset(false); save(); render();
+  });
+
+  function showDel(on) { $("del-btn").hidden = on; $("del-yes").hidden = !on; $("del-no").hidden = !on; }
+  $("del-btn").addEventListener("click", function () { showDel(true); });
+  $("del-no").addEventListener("click", function () { showDel(false); });
+  $("del-yes").addEventListener("click", function () {
+    var id = state.id;
+    data.projects = data.projects.filter(function (p) { return p.id !== id; });
+    save(); go("home");
+  });
+  $("back").addEventListener("click", function () { go("home"); });
+  $("go-belege").addEventListener("click", function () { go("belege"); });
+  $("new-project").addEventListener("click", function () {
+    var p = newProject("Neues Projekt");
+    data.projects.push(p);
+    save(); go("p-" + p.id);
+    $("settings").open = true;
+    setTimeout(function () { $("t-name").focus(); $("t-name").select(); }, 60);
   });
 
   $("trip-line").addEventListener("click", function () { $("settings").open = true; $("settings").scrollIntoView({ behavior: "smooth", block: "start" }); });
 
+  bindView();
   render();
   connect();
 })();
