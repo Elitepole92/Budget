@@ -750,6 +750,15 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
 
       y = Math.max(y + 14, 210);
       if (y > 250) { doc.addPage(); y = 40; }
+      // Ort (aus der Anschrift des Restaurants) und Datum der Erstellung vorausfüllen
+      var city = "";
+      var mPlz = /\b\d{5}\s+([^,\n]+)/.exec(b.address || "");
+      if (mPlz) city = mPlz[1].trim();
+      else if (b.address) { var parts = b.address.split(/,|\n/); city = parts[parts.length - 1].trim(); }
+      var now = new Date();
+      var created = pad(now.getDate()) + "." + pad(now.getMonth() + 1) + "." + now.getFullYear();
+      doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+      doc.text((city ? city + ", " : "") + created, L, y - 2);
       doc.setDrawColor(0);
       doc.line(L, y, L + 75, y); doc.line(L + 95, y, L + W, y);
       doc.setFont("helvetica", "normal"); doc.setFontSize(9);
