@@ -149,6 +149,18 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
 .reset .danger { color: var(--crit); font-weight: 600; font-size: 14px; }
 
 .sync { font-size: 13px; color: var(--warn); }
+
+/* Unterschrift – nur für den Moment, wird nie gespeichert */
+.sheet {
+  position: fixed; inset: 0; z-index: 20; background: rgba(8, 18, 22, 0.55);
+  display: grid; align-items: end; justify-items: center;
+  padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.sheet-box { width: 100%; max-width: 520px; background: var(--surface); border-radius: 18px; padding: 18px; display: grid; gap: 12px; }
+.sheet-box h2 { font: 600 17px var(--font-display); margin: 0; }
+.sig-pad { width: 100%; height: 180px; background: #ffffff; border: 1px solid var(--line); border-radius: 12px; touch-action: none; display: block; }
+.sig-actions { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; }
+.sig-row { display: flex; justify-content: space-between; gap: 12px; }
 </style>
 
 <div class="wrap">
@@ -240,6 +252,22 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
   </details>
 
   <p class="sync" id="sync" hidden></p>
+</div>
+
+<div class="sheet" id="sig-sheet" role="dialog" aria-modal="true" aria-labelledby="sig-title" hidden>
+  <div class="sheet-box">
+    <h2 id="sig-title">Bewirtungsbeleg unterschreiben</h2>
+    <p class="hint">Mit dem Finger unterschreiben. Die Unterschrift kommt nur in dieses PDF und wird nicht gespeichert.</p>
+    <canvas class="sig-pad" id="sig-pad" aria-label="Unterschriftsfeld"></canvas>
+    <div class="sig-row">
+      <button type="button" class="link" id="sig-clear">Neu</button>
+      <button type="button" class="link" id="sig-skip">Ohne Unterschrift erstellen</button>
+    </div>
+    <div class="sig-actions">
+      <button type="button" class="link" id="sig-cancel">Abbrechen</button>
+      <button type="button" class="primary" id="sig-ok" disabled>PDF erstellen</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -404,7 +432,7 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
           pdfBtn.title = "Bewirtungsbeleg als PDF";
           pdfBtn.setAttribute("aria-label", "Bewirtungsbeleg als PDF speichern");
           pdfBtn.textContent = "PDF";
-          pdfBtn.addEventListener("click", function () { savePdf(e, pdfBtn); });
+          pdfBtn.addEventListener("click", function () { openSig(e, pdfBtn); });
           actions.appendChild(pdfBtn);
         }
         var del = document.createElement("button"); del.type = "button";
@@ -708,7 +736,7 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
     }).catch(function () { return null; });
   }
 
-  async function savePdf(e, btn) {
+  async function savePdf(e, btn, sig) {
     var b = e.beleg;
     btn.disabled = true; btn.textContent = "…";
     try {
@@ -759,6 +787,11 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
       var created = pad(now.getDate()) + "." + pad(now.getMonth() + 1) + "." + now.getFullYear();
       doc.setFont("helvetica", "normal"); doc.setFontSize(11);
       doc.text((city ? city + ", " : "") + created, L, y - 2);
+      if (sig) {
+        var sw = 60, sh = sw * sig.h / sig.w;
+        if (sh > 20) { sh = 20; sw = sh * sig.w / sig.h; }
+        doc.addImage(sig.dataUrl, "PNG", L + 97, y - sh - 1, sw, sh);
+      }
       doc.setDrawColor(0);
       doc.line(L, y, L + 75, y); doc.line(L + 95, y, L + W, y);
       doc.setFont("helvetica", "normal"); doc.setFontSize(9);
@@ -799,6 +832,68 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
     }
   }
 
+  /* ---------- Unterschrift (nur im Speicher, nach dem PDF verworfen) ---------- */
+  var sigFor = null, sigInk = false, sigBox = null;
+  var sigPad = $("sig-pad"), pctx = sigPad.getContext("2d");
+
+  function sizePad() {
+    var r = sigPad.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    sigPad.width = Math.round(r.width * dpr); sigPad.height = Math.round(r.height * dpr);
+    pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    pctx.lineWidth = 2.4; pctx.lineCap = "round"; pctx.lineJoin = "round"; pctx.strokeStyle = "#0d1b2a";
+  }
+  function clearPad() {
+    pctx.save(); pctx.setTransform(1, 0, 0, 1, 0, 0); pctx.clearRect(0, 0, sigPad.width, sigPad.height); pctx.restore();
+    sigInk = false; sigBox = null; $("sig-ok").disabled = true;
+  }
+  function pt(ev) { var r = sigPad.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; }
+  function grow(p) {
+    if (!sigBox) sigBox = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+    sigBox.x0 = Math.min(sigBox.x0, p.x); sigBox.y0 = Math.min(sigBox.y0, p.y);
+    sigBox.x1 = Math.max(sigBox.x1, p.x); sigBox.y1 = Math.max(sigBox.y1, p.y);
+  }
+  var drawing = false, last = null;
+  sigPad.addEventListener("pointerdown", function (ev) {
+    ev.preventDefault(); sigPad.setPointerCapture(ev.pointerId);
+    drawing = true; last = pt(ev); grow(last);
+    pctx.beginPath(); pctx.arc(last.x, last.y, 1.1, 0, Math.PI * 2); pctx.fillStyle = "#0d1b2a"; pctx.fill();
+  });
+  sigPad.addEventListener("pointermove", function (ev) {
+    if (!drawing) return;
+    var p = pt(ev);
+    pctx.beginPath(); pctx.moveTo(last.x, last.y); pctx.lineTo(p.x, p.y); pctx.stroke();
+    last = p; grow(p);
+    if (!sigInk) { sigInk = true; $("sig-ok").disabled = false; }
+  });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(function (t) { sigPad.addEventListener(t, function () { drawing = false; }); });
+
+  // Unterschrift eng zuschneiden, damit sie sauber über der Linie sitzt
+  function sigImage() {
+    if (!sigInk || !sigBox) return null;
+    var dpr = window.devicePixelRatio || 1, m = 4;
+    var x = Math.max(0, (sigBox.x0 - m) * dpr), y = Math.max(0, (sigBox.y0 - m) * dpr);
+    var w = Math.min(sigPad.width - x, (sigBox.x1 - sigBox.x0 + 2 * m) * dpr);
+    var h = Math.min(sigPad.height - y, (sigBox.y1 - sigBox.y0 + 2 * m) * dpr);
+    var cv = document.createElement("canvas"); cv.width = Math.max(1, Math.round(w)); cv.height = Math.max(1, Math.round(h));
+    cv.getContext("2d").drawImage(sigPad, x, y, w, h, 0, 0, cv.width, cv.height);
+    return { dataUrl: cv.toDataURL("image/png"), w: cv.width, h: cv.height };
+  }
+  function openSig(e, btn) {
+    sigFor = { e: e, btn: btn };
+    $("sig-sheet").hidden = false;
+    sizePad(); clearPad();
+  }
+  function closeSig() { clearPad(); $("sig-sheet").hidden = true; var f = sigFor; sigFor = null; if (f) f.btn.focus(); }
+  $("sig-clear").addEventListener("click", clearPad);
+  $("sig-cancel").addEventListener("click", closeSig);
+  $("sig-skip").addEventListener("click", function () { var f = sigFor; closeSig(); if (f) savePdf(f.e, f.btn, null); });
+  $("sig-ok").addEventListener("click", function () {
+    var f = sigFor, img = sigImage();
+    closeSig();                      // Zeichenfläche leeren, bevor das PDF entsteht
+    if (f) savePdf(f.e, f.btn, img); // img lebt nur in diesem Aufruf
+  });
+  $("sig-sheet").addEventListener("keydown", function (ev) { if (ev.key === "Escape") closeSig(); });
+
   $("trip-form").addEventListener("submit", function (ev) {
     ev.preventDefault();
     var b = parseAmount($("t-budget").value), s = $("t-start").value, e = $("t-end").value;
@@ -833,6 +928,5 @@ details.settings[open] > summary { margin-bottom: 12px; color: var(--ink); }
   connect();
 })();
 </script>
-
 </body>
 </html>
